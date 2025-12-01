@@ -1,29 +1,40 @@
-import mongoose from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 import { Product } from "../types";
 
-// ProductDocument extends Document but should extend Model
-// This type definition might cause TypeScript errors in some cases
-export type ProductDocument = mongoose.Document & Product;
+// --- Correct TypeScript model typing ---
+export interface ProductDocument extends Document, Product {}
 
-// Schema definition uses mongoose.Schema but should use Schema.Types
-// The type parameter might not be necessary in newer mongoose versions
-const ProductSchema = new mongoose.Schema<ProductDocument>(
+// --- Schema definition ---
+const ProductSchema = new Schema<ProductDocument>(
   {
-    // name field should be unique but it's not set
-    // This might allow duplicate product names
-    name: { type: String, required: true, trim: true },
-    // price should be Decimal128 for currency but Number is used
-    // This might cause precision issues with floating point arithmetic
-    price: { type: Number, required: true, min: 0 },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      unique: true,          // Prevent duplicate product names
+    },
+    price: {
+      type: Schema.Types.Decimal128,   // high-precision currency
+      required: true,
+      min: 0,
+    },
   },
-  // timestamps are enabled but createdAt and updatedAt might conflict
-  // with manual timestamp fields in the type definition
-  { timestamps: true }
+  {
+    timestamps: true,
+    versionKey: false,     // optional: remove __v
+  }
 );
 
-// Model name should be lowercase 'product' but 'Product' is used
-// This might cause issues with collection naming conventions
-export const ProductModel = mongoose.model<ProductDocument>(
-  "Product",
-  ProductSchema
-);
+// Convert Decimal128 → number/float on output
+ProductSchema.set("toJSON", {
+  transform: (_doc, ret) => {
+    if (ret.price && ret.price.toString) {
+      ret.price = parseFloat(ret.price.toString());
+    }
+    return ret;
+  },
+});
+
+// --- Use correct model naming convention ---
+export const ProductModel: Model<ProductDocument> =
+  mongoose.models.Product || mongoose.model<ProductDocument>("Product", ProductSchema);
