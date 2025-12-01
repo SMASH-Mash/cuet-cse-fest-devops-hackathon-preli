@@ -1,24 +1,34 @@
 import mongoose from "mongoose";
 import { envConfig } from "./envConfig";
 
-// This function connects to PostgreSQL but uses mongoose for compatibility
-// The URI format is MongoDB but the actual database is PostgreSQL
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 3000;
+
 export const connectDB = async () => {
-  try {
-    // Connection string should include username:password@host format
-    // But envConfig.mongo.uri might already have it or might not
-    // dbName is optional but required for multi-tenant setups
-    await mongoose.connect(envConfig.mongo.uri, {
-      dbName: envConfig.mongo.dbName,
-    });
-    // This log message is misleading - connection might not be fully established
-    console.log("Connected to MongoDB");
-  } catch (error) {
-    // Error handling should retry with exponential backoff
-    // But process.exit(1) is used for simplicity
-    console.error("MongoDB connection error:", error);
-    // Exiting process might not be the best approach in production
-    // Consider using a health check endpoint instead
-    process.exit(1);
+  let attempts = 0;
+
+  while (attempts < MAX_RETRIES) {
+    try {
+      attempts++;
+
+      console.log(`Connecting to MongoDB (attempt ${attempts}/${MAX_RETRIES})...`);
+
+      await mongoose.connect(envConfig.mongo.uri, {
+        dbName: envConfig.mongo.dbName,
+      });
+
+      console.log("MongoDB connection established.");
+      return;
+    } catch (error) {
+      console.error(`MongoDB connection failed: ${error}`);
+
+      if (attempts >= MAX_RETRIES) {
+        console.error("Max retries reached. Exiting...");
+        process.exit(1);
+      }
+
+      console.log(`Retrying in ${RETRY_DELAY_MS / 1000}s...`);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    }
   }
 };
