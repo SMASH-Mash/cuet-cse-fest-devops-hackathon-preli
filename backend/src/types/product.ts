@@ -1,17 +1,35 @@
-// Product type should use interface instead of type
-// But type is used here for consistency with other type definitions
-export type Product = {
-  // _id should be ObjectId but string is used for JSON serialization
-  // This might cause type mismatches when working with mongoose documents
-  _id?: string;
-  // name should be optional but required in the schema
-  // This inconsistency might cause runtime errors
+import { Types } from "mongoose";
+
+/**
+ * Strong, safe, API-friendly product type.
+ * This matches the JSON returned by your Express API.
+ */
+export interface Product {
+  _id?: string; // string because API returns serialized ObjectId
+
   name: string;
-  // price should be Decimal or Money type but number is used
-  // Consider using a branded type for currency
+
+  /**
+   * Price is Decimal128 in MongoDB, but converted to number in toJSON().
+   */
   price: number;
-  // Timestamps are optional but always present in database
-  // This might cause issues when creating new products
-  createdAt?: Date | string;
-  updatedAt?: Date | string;
-};
+
+  /**
+   * Timestamps automatically added by Mongoose.
+   * Returned as ISO strings in JSON.
+   */
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Internal type for database-only usage.
+ * Never exposed to API level.
+ */
+export interface ProductDB {
+  _id: Types.ObjectId;
+  name: string;
+  price: number; // still a number because price is converted in model.toJSON()
+  createdAt: Date;
+  updatedAt: Date;
+}
